@@ -141,7 +141,6 @@ class _BenchmarkIterator:
         output = next(self.it)
         torch.cuda.nvtx.range_pop()
       except StopIteration:
-        print("stopped!")
         torch.cuda.nvtx.range_pop() # STEP
         torch.cuda.nvtx.range_pop() # MAIN
         raise StopIteration
