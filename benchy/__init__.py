@@ -65,17 +65,17 @@ def _get_default_config():
 
 def _print_results_summary(results):
   if 'IO' in results.keys():
-    io_avg = np.mean(results['IO']['avg_throughput'])
-    io_std = np.std(results['IO']['avg_throughput'])
-    print("BENCHY::SUMMARY::IO average throughput: {0:.3f} +/- {1:.3f}".format(io_avg, io_std))
+    io_avg = np.mean(results['IO']['trial_throughput'])
+    io_std = np.std(results['IO']['trial_throughput'])
+    print("BENCHY::SUMMARY::IO average trial throughput: {0:.3f} +/- {1:.3f}".format(io_avg, io_std))
   if 'SYNTHETIC' in results.keys():
-    synth_avg = np.mean(results['SYNTHETIC']['avg_throughput'])
-    synth_std = np.std(results['SYNTHETIC']['avg_throughput'])
-    print("BENCHY::SUMMARY:: SYNTHETIC average throughput: {0:.3f} +/- {1:.3f}".format(synth_avg, synth_std))
+    synth_avg = np.mean(results['SYNTHETIC']['trial_throughput'])
+    synth_std = np.std(results['SYNTHETIC']['trial_throughput'])
+    print("BENCHY::SUMMARY:: SYNTHETIC average trial throughput: {0:.3f} +/- {1:.3f}".format(synth_avg, synth_std))
   if 'FULL' in results.keys():
-    full_avg = np.mean(results['FULL']['avg_throughput'])
-    full_std = np.std(results['FULL']['avg_throughput'])
-    print("BENCHY::SUMMARY::FULL average throughput: {0:.3f} +/- {1:.3f}".format(full_avg, full_std))
+    full_avg = np.mean(results['FULL']['trial_throughput'])
+    full_std = np.std(results['FULL']['trial_throughput'])
+    print("BENCHY::SUMMARY::FULL average trial throughput: {0:.3f} +/- {1:.3f}".format(full_avg, full_std))
 
 def _initialize(rank, framework):
     benchy_config = _get_default_config()

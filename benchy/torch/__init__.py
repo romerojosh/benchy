@@ -76,7 +76,10 @@ class _BenchmarkIterator:
 
     self.results = results
     if self.label.split('_')[0] not in self.results.keys() and not self.skip_results:
-      self.results[self.label.split('_')[0]] = {"rates" : [], "avg_throughput" : []}
+      self.results[self.label.split('_')[0]] = {"rates" : [],
+                                                "avg_iter_throughput" : [],
+                                                "trial_throughput" : [],
+                                                "trial_time" : []}
 
     self.rank = 0
     self.comm_size = 1
@@ -96,6 +99,7 @@ class _BenchmarkIterator:
     if not self.t0:
       _barrier(self.dist_barrier)
       self.t0 = time.time()
+      self.t0_total = self.t0
       torch.cuda.nvtx.range_push(f"BENCHY::BenchmarkIterator::{self.label}")
       torch.cuda.nvtx.range_push(f"BENCHY::BenchmarkIterator::{self.label}::STEP_{self.count}")
     else:
@@ -109,18 +113,24 @@ class _BenchmarkIterator:
       self.t0 = t1
       if self.sample_count == self.report_freq:
         if self.rank == 0:
-          print(f"BENCHY::{self.label}::Throughput: {rate}")
+          print(f"BENCHY::{self.label}::Iteration Throughput: {rate}")
         self.sample_count = 0
 
       if self.count == self.nbatches:
         if self.rank == 0:
-          average_rate = sum(self.rates)/len(self.rates)
-          print(f"BENCHY::{self.label}::Avg Throughput: {average_rate}")
+          average_iter_rate = sum(self.rates)/len(self.rates)
+          print(f"BENCHY::{self.label}::Average Iteration Throughput: {average_iter_rate}")
+
+          trial_time = t1 - self.t0_total
+          trial_rate =  (self.nbatches * self.batch_size * self.comm_size) / trial_time
+          print(f"BENCHY::{self.label}::Trial Throughput: {trial_rate}")
           torch.cuda.nvtx.range_pop() # STEP
           torch.cuda.nvtx.range_pop() # MAIN
           if not self.skip_results:
             self.results[self.label.split('_')[0]]["rates"].append(self.rates)
-            self.results[self.label.split('_')[0]]["avg_throughput"].append(average_rate)
+            self.results[self.label.split('_')[0]]["avg_iter_throughput"].append(average_iter_rate)
+            self.results[self.label.split('_')[0]]["trial_throughput"].append(trial_rate)
+            self.results[self.label.split('_')[0]]["trial_time"].append(trial_time)
         raise StopIteration
 
     if self.cached:
