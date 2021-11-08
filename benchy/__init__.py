@@ -41,7 +41,7 @@ def _get_default_config():
   config = {'global': {'report_freq': 10,
                         'exit_after_tests': True,
                         'profiler_mode': 'single',
-                        'json_prefix': 'benchy_result',
+                        'output_filename': 'benchy_result.json',
                         'output_dir': os.getcwd(),
                         'use_distributed_barrier': False,
                        },
@@ -111,10 +111,11 @@ def _finalize(self):
     if self.rank == 0:
       _print_results_summary(self.results)
 
-      os.makedirs(self.benchy_config["global"]["output_dir"], exist_ok=True)
+      output_dir = self.benchy_config["global"]["output_dir"]
+      os.makedirs(output_dir, exist_ok=True)
 
-      json_file = ".".join([self.benchy_config["global"]["json_prefix"], datetime.now().strftime("%d%m%y-%H:%M:%S"), "json"])
-      json_file = os.path.join(self.benchy_config["global"]["output_dir"], json_file)
+      json_file = self.benchy_config["global"]["output_filename"]
+      json_file = os.path.join(output_dir, json_file)
       print(f"BENCHY::INFO::Message: Writing JSON output to {json_file}.")
       with open(json_file, 'w') as f:
         json.dump(self.results, f)
