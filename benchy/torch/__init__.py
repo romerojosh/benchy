@@ -53,6 +53,20 @@ def _init_self(self):
     self.results = {}
     self.results["nranks"] = self.comm_size
 
+# Helper wrapper to make iterators "infinite" to get full trial batches
+class _it_func_wrapper(object):
+  def __init__(self, it_func):
+    self.it_func = it_func
+    self.it = it_func()
+
+  def __next__(self):
+    try:
+      ret = next(self.it)
+    except StopIteration:
+      self.it = self.it_func()
+      ret = next(self.it)
+    return ret
+
 class _BenchmarkIterator:
   def __init__(self, it, batch_size, report_freq, nbatches, label,
                results, cached, dist_barrier):
@@ -66,10 +80,7 @@ class _BenchmarkIterator:
     self.cached = cached
     self.dist_barrier = dist_barrier
     self.cached_output = None
-    try:
-      self.nbatches = len(it) if not nbatches else min(len(it), nbatches)
-    except:
-      self.nbatches = nbatches
+    self.nbatches = nbatches
 
     self.label = label
     self.skip_results = "WARMUP" in label
@@ -141,6 +152,7 @@ class _BenchmarkIterator:
         output = next(self.it)
         torch.cuda.nvtx.range_pop()
       except StopIteration:
+        torch.cuda.nvtx.range_pop() # DATA
         torch.cuda.nvtx.range_pop() # STEP
         torch.cuda.nvtx.range_pop() # MAIN
         raise StopIteration
@@ -154,23 +166,25 @@ def _run_io_bench(self, it_func):
   if self.benchy_config["IO"]["run_benchmark"]:
     nt = self.benchy_config["IO"]["ntrials"]
     nw = self.benchy_config["IO"]["nwarmup"]
+    wrapped_it = _it_func_wrapper(it_func)
     for n in range(nt + nw):
-      it = it_func()
       label = f"IO_{n - nw}" if n >= nw else f"IO_WARMUP_{n}"
-      it = _BenchmarkIterator(it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
+      it = _BenchmarkIterator(wrapped_it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
                              nbatches=self.benchy_config["IO"]["nbatches"], label=label,
                              results=self.results, cached=False,
                              dist_barrier=self.benchy_config["global"]["use_distributed_barrier"])
       for _ in it:
         pass
 
-def _run_synth_full_bench(self, it):
+def _run_synth_full_bench(self, it_func):
+    wrapped_it = _it_func_wrapper(it_func)
+
     if (self.benchy_config["synthetic"]["run_benchmark"] and
        self.synth_count < self.benchy_config["synthetic"]["ntrials"] +  self.benchy_config["synthetic"]["nwarmup"]):
       nt = self.benchy_config["synthetic"]["ntrials"]
       nw = self.benchy_config["synthetic"]["nwarmup"]
       label = f"SYNTHETIC_{self.synth_count - nw}" if self.synth_count >= nw else f"SYNTHETIC_WARMUP_{self.synth_count}"
-      it = _BenchmarkIterator(it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
+      it = _BenchmarkIterator(wrapped_it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
                              nbatches=self.benchy_config["synthetic"]["nbatches"], label=label,
                              results=self.results, cached=True,
                              dist_barrier=self.benchy_config["global"]["use_distributed_barrier"])
@@ -182,7 +196,7 @@ def _run_synth_full_bench(self, it):
       nt = self.benchy_config["full"]["ntrials"]
       nw = self.benchy_config["full"]["nwarmup"]
       label = f"FULL_{self.full_count - nw}" if self.full_count >= nw else f"FULL_WARMUP_{self.full_count}"
-      it = _BenchmarkIterator(it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
+      it = _BenchmarkIterator(wrapped_it, self.batch_size, report_freq=self.benchy_config["global"]["report_freq"],
                              nbatches=self.benchy_config["full"]["nbatches"], label=label,
                              results=self.results, cached=False,
                              dist_barrier=self.benchy_config["global"]["use_distributed_barrier"])
@@ -200,8 +214,8 @@ class BenchmarkDataLoader(DataLoader):
     _run_io_bench(self, it_func)
 
   def __iter__(self):
-    it = super(BenchmarkDataLoader, self).__iter__()
-    it_out = _run_synth_full_bench(self, it)
+    it_func = super(BenchmarkDataLoader, self).__iter__
+    it_out = _run_synth_full_bench(self, it_func)
     if it_out:
       return it_out
 
@@ -220,8 +234,8 @@ class BenchmarkGenericIteratorWrapper(object):
     _run_io_bench(self, it_func)
 
   def __iter__(self):
-    it = self.iterator.__iter__()
-    it_out = _run_synth_full_bench(self, it)
+    it_func = self.iterator.__iter__
+    it_out = _run_synth_full_bench(self, it_func)
     if it_out:
       return it_out
 
